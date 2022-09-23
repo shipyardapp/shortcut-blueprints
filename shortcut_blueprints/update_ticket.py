@@ -1,7 +1,6 @@
 import argparse
 import sys
 import requests
-from requests.auth import HTTPBasicAuth
 import shipyard_utils as shipyard
 try:
     import exit_codes
@@ -19,6 +18,7 @@ shipyard.logs.create_artifacts_folders(artifact_subfolder_paths)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--access-token', dest='access_token', required=True)
+    parser.add_argument('--story-public-id', dest='story_public_id', required=True)
     parser.add_argument('--name', dest='name', required=True)
     parser.add_argument('--description', dest='description', required=True)
     parser.add_argument('--issue-type', dest='issue_type', required=True)
@@ -32,13 +32,15 @@ def get_args():
 
 
 
-def create_story(token, name, description, issue_type, estimate=None,
+def update_story(token, story_id, name, description, issue_type, estimate=None,
                 deadline=None, epic_id=None, custom_fields=None):
-    """ Triggers the Create Story API and adds a new story to shortcut
-    see: https://shortcut.com/api/rest/v3#Create-Story
+    """ Triggers the Update Story API to update Story properties.
+    see: https://shortcut.com/api/rest/v3#Update-Story
+    
+    story_id: the story-public-id (The unique identifier of this story.)
     """
     
-    create_story_endpoint = "https://api.app.shortcut.com/api/v3/stories"
+    update_api = f"https://api.app.shortcut.com/api/v3/stories/{story_id}"
 
     headers = {
       'Content-Type': 'application/json',
@@ -64,14 +66,13 @@ def create_story(token, name, description, issue_type, estimate=None,
     if custom_fields:
         payload['custom_fields'] = custom_fields
 
-    response = requests.post(create_story_endpoint, 
+    response = requests.post(update_api, 
                              headers=headers, 
                              data=payload
                              )
 
-    if response.status_code == 201: # created successfuly
-        new_story_url =  response.json()['app_url']
-        print(f"Story created successfully at: {new_story_url}")
+    if response.status_code == 200: # updated successfuly
+        print(f"Story {story_id} updated successfully")
         return response.json()
 
     elif response.status_code == 401: # Permissions Error
@@ -105,6 +106,7 @@ def create_story(token, name, description, issue_type, estimate=None,
 def main():
     args = get_args()
     access_token = args.access_token
+    story_public_id = args.story_public_id
     custom_json = args.custom_json
     epic_id = args.epic_id
     deadline = args.deadline
@@ -112,12 +114,12 @@ def main():
     description = args.description
     issue_type = args.issue_type
 
-    story_data = create_story(access_token, name, description, issue_type, 
-                deadline, epic_id, custom_json)
+    story_data = update_story(access_token, story_public_id ,name, description, 
+                              issue_type, deadline, epic_id, custom_json)
 
     story_id = story_data['id']
     
-    # save issue to responses
+    # save response
     issue_data_filename = shipyard.files.combine_folder_and_file_name(
         artifact_subfolder_paths['responses'],
         f'create_story_{story_id}_response.json')
