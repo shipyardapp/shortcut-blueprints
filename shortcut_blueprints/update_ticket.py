@@ -24,7 +24,6 @@ def get_args():
     parser.add_argument('--issue-type', dest='issue_type', required=True)
     parser.add_argument('--deadline', dest='deadline', required=False)
     parser.add_argument('--estimate', dest='estimate', required=False)
-    parser.add_argument('--epic-id', dest='epic_id', required=False)    
     parser.add_argument('--custom-json', dest='custom_json', required=False)
     args = parser.parse_args()
     return args
@@ -60,15 +59,12 @@ def update_story(token, story_id, name, description, issue_type, estimate=None,
     if deadline:
         payload["deadline"] = deadline
 
-    if epic_id:
-        payload["epic_id"] = epic_id
-
     if custom_fields:
         payload['custom_fields'] = custom_fields
 
     response = requests.post(update_api, 
                              headers=headers, 
-                             data=payload
+                             json=payload
                              )
 
     if response.status_code == 200: # updated successfuly
@@ -108,14 +104,13 @@ def main():
     access_token = args.access_token
     story_public_id = args.story_public_id
     custom_json = args.custom_json
-    epic_id = args.epic_id
     deadline = args.deadline
     name = args.name
     description = args.description
     issue_type = args.issue_type
 
     story_data = update_story(access_token, story_public_id ,name, description, 
-                              issue_type, deadline, epic_id, custom_json)
+                              issue_type, deadline, custom_json)
 
     story_id = story_data['id']
     
