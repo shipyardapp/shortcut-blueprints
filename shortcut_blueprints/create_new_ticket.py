@@ -24,7 +24,8 @@ def get_args():
     parser.add_argument('--issue-type', dest='issue_type', required=True)
     parser.add_argument('--deadline', dest='deadline', required=False)
     parser.add_argument('--estimate', dest='estimate', required=False)
-    parser.add_argument('--epic-id', dest='epic_id', required=False)    
+    parser.add_argument('--workflow-state-id', dest='workflow_state_id', required=False)
+    parser.add_argument('--project-id', dest='project_id', required=False)    
     parser.add_argument('--custom-json', dest='custom_json', required=False)
     args = parser.parse_args()
     return args
@@ -33,7 +34,7 @@ def get_args():
 
 
 def create_story(token, name, description, issue_type, estimate=None,
-                deadline=None, epic_id=None, custom_fields=None):
+                deadline=None, project_id=None, workflow_state_id=None, custom_fields=None):
     """ Triggers the Create Story API and adds a new story to shortcut
     see: https://shortcut.com/api/rest/v3#Create-Story
     """
@@ -58,15 +59,18 @@ def create_story(token, name, description, issue_type, estimate=None,
     if deadline:
         payload["deadline"] = deadline
 
-    if epic_id:
-        payload["epic_id"] = epic_id
+    if project_id:
+        payload["project_id"] = project_id
+
+    if workflow_state_id:
+        payload['workflow_state_id'] = workflow_state_id
 
     if custom_fields:
         payload['custom_fields'] = custom_fields
 
     response = requests.post(create_story_endpoint, 
                              headers=headers, 
-                             data=payload
+                             json=payload
                              )
 
     if response.status_code == 201: # created successfuly
@@ -106,14 +110,15 @@ def main():
     args = get_args()
     access_token = args.access_token
     custom_json = args.custom_json
-    epic_id = args.epic_id
+    project_id = args.project_id
+    workflow_state_id = args.workflow_state_id
     deadline = args.deadline
     name = args.name
     description = args.description
     issue_type = args.issue_type
 
     story_data = create_story(access_token, name, description, issue_type, 
-                deadline, epic_id, custom_json)
+                deadline, project_id, workflow_state_id ,custom_json)
 
     story_id = story_data['id']
     
