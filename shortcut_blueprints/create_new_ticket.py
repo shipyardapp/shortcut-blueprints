@@ -1,5 +1,6 @@
 import argparse
 import sys
+from datetime import datetime
 import requests
 from requests.auth import HTTPBasicAuth
 import shipyard_utils as shipyard
@@ -31,6 +32,14 @@ def get_args():
     return args
 
 
+
+def convert_date_to_shortcut(shipyard_date):
+    """Converts date from shipyard input MM/DD/YYYY to 
+    ISO 8086 date.
+    """ 
+    str_as_date = datetime.strptime(shipyard_date, '%m/%d/%Y')
+    shortcut_date = str_as_date.isoformat() + "Z"
+    return shortcut_date
 
 
 def create_story(token, name, description, issue_type, estimate=None,
@@ -112,7 +121,8 @@ def main():
     custom_json = args.custom_json
     project_id = args.project_id
     workflow_state_id = args.workflow_state_id
-    deadline = args.deadline
+    # convert deadline to datetime
+    deadline = convert_date_to_shortcut(args.deadline)
     name = args.name
     description = args.description
     issue_type = args.issue_type
