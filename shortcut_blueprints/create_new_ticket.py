@@ -30,7 +30,6 @@ def get_args():
     parser.add_argument('--created-at', dest='created_at', required=False)
     parser.add_argument('--external-id', dest='external_id', required=False)
     parser.add_argument('--external-links', dest='external_links', required=False)
-    parser.add_argument('--labels', dest='labels', required=False)
     parser.add_argument('--owners', dest='owners', required=False) 
     parser.add_argument('--custom-json', dest='custom_json', required=False)
     parser.add_argument('--issue-type', 
@@ -167,6 +166,28 @@ def get_label_ids_by_names(token, label_names):
         return label_ids
 
 
+def get_member_ids_by_names(token, member_names):
+    """Get a list of member ids associated with a name """
+    member_endpoint = "https://api.app.shortcut.com/api/v3/members"
+
+    headers = {
+      'Content-Type': 'application/json',
+      "Shortcut-Token": token
+    }
+
+    response = requests.get(member_endpoint,
+                             headers=headers
+                            )
+
+    if response.status_code == 200:
+        member_data = response.json()
+        member_ids = [
+            member['id'] for member in member_data
+            if member['name'] in member_names
+        ]
+        return member_ids
+
+
 def main():
     args = get_args()
     access_token = args.access_token
@@ -196,6 +217,10 @@ def main():
 
     if args.custom_json:
         query_data['custom_fields'] = args.custom_json
+    
+    member_ids = get_member_ids_by_names(access_token, literal_eval(args.owners))
+    if member_ids:
+        query_data['owner_ids'] = member_ids
     
     # add attachments
     file_ids = []
