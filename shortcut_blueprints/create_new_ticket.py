@@ -1,9 +1,10 @@
 import argparse
 import sys
-import requests
 from datetime import datetime
 from ast import literal_eval
 import re
+import requests
+from requests.auth import HTTPBasicAuth
 import shipyard_utils as shipyard
 try:
     import exit_codes
@@ -21,15 +22,15 @@ shipyard.logs.create_artifacts_folders(artifact_subfolder_paths)
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--access-token', dest='access_token', required=True)
-    parser.add_argument('--story-public-id', dest='story_public_id', required=True)
-    parser.add_argument('--name', dest='name', required=False)
-    parser.add_argument('--description', dest='description', required=False)
+    parser.add_argument('--name', dest='name', required=True)
+    parser.add_argument('--description', dest='description', required=True)
+    parser.add_argument('--project-id', dest='project_id', required=True)
     parser.add_argument('--deadline', dest='deadline', required=False)
     parser.add_argument('--estimate', dest='estimate', required=False)
     parser.add_argument('--created-at', dest='created_at', required=False)
     parser.add_argument('--external-id', dest='external_id', required=False)
     parser.add_argument('--external-links', dest='external_links', required=False)
-    parser.add_argument('--followers', dest='followers', required=False) 
+    parser.add_argument('--owners', dest='owners', required=False) 
     parser.add_argument('--custom-json', dest='custom_json', required=False)
     parser.add_argument('--issue-type', 
                         dest='issue_type', 
@@ -54,15 +55,21 @@ def get_args():
 
 
 
+def convert_date_to_shortcut(shipyard_date):
+    """Converts date from shipyard input MM/DD/YYYY to 
+    ISO 8086 date.
+    """ 
+    str_as_date = datetime.strptime(shipyard_date, '%m/%d/%Y')
+    shortcut_date = str_as_date.isoformat() + "Z"
+    return shortcut_date
 
-def update_story(token, story_id, query_data):
-    """ Triggers the Update Story API to update Story properties.
-    see: https://shortcut.com/api/rest/v3#Update-Story
-    
-    story_id: the story-public-id (The unique identifier of this story.)
+
+def create_story(token, name, description, issue_type, query_data):
+    """ Triggers the Create Story API and adds a new story to shortcut
+    see: https://shortcut.com/api/rest/v3#Create-Story
     """
     
-    update_api = f"https://api.app.shortcut.com/api/v3/stories/{story_id}"
+    create_story_endpoint = "https://api.app.shortcut.com/api/v3/stories"
 
     headers = {
       'Content-Type': 'application/json',
@@ -71,16 +78,21 @@ def update_story(token, story_id, query_data):
 
     payload = {
         "archived": True, 
-        "move_to": "first"
+        "description": description,
+        "move_to": "first", 
+        "name": name, 
+        "story_type": issue_type
     }
     payload.update(query_data)
-    response = requests.post(update_api, 
+
+    response = requests.post(create_story_endpoint, 
                              headers=headers, 
                              json=payload
                              )
 
-    if response.status_code == 200: # updated successfuly
-        print(f"Story {story_id} updated successfully")
+    if response.status_code == 201: # created successfuly
+        new_story_url =  response.json()['app_url']
+        print(f"Story created successfully at: {new_story_url}")
         return response.json()
 
     elif response.status_code == 401: # Permissions Error
@@ -111,15 +123,6 @@ def update_story(token, story_id, query_data):
         sys.exit(exit_codes.UNKNOWN_ERROR)
 
 
-def convert_date_to_shortcut(shipyard_date):
-    """Converts date from shipyard input MM/DD/YYYY to 
-    ISO 8086 date.
-    """ 
-    str_as_date = datetime.strptime(shipyard_date, '%m/%d/%Y')
-    shortcut_date = str_as_date.isoformat() + "Z"
-    return shortcut_date
-
-
 def upload_file_attachment(token, file_path):
     """ Uploads files to Shortcut API """
 
@@ -139,6 +142,28 @@ def upload_file_attachment(token, file_path):
     if response.status_code == 200:
         print(f'{file_path} was successfully uploaded to Shortcut')
     return response.json()
+
+
+def get_label_ids_by_names(token, label_names):
+    """Get a list of label ids associated with a name """
+    labels_endpoint = "https://api.app.shortcut.com/api/v3/labels"
+
+    headers = {
+      'Content-Type': 'application/json',
+      "Shortcut-Token": token
+    }
+
+    response = requests.get(labels_endpoint,
+                             headers=headers
+                            )
+
+    if response.status_code == 200:
+        labels_data = response.json()
+        label_ids = [
+            label['id'] for label in labels_data
+            if label['name'] in label_names
+        ]
+        return label_ids
 
 
 def get_member_ids_by_names(token, member_names):
@@ -162,25 +187,19 @@ def get_member_ids_by_names(token, member_names):
         ]
         return member_ids
 
+
 def main():
     args = get_args()
     access_token = args.access_token
-    story_public_id = args.story_public_id
+    name = args.name
+    description = args.description
+    issue_type = args.issue_type
     source_file_name = args.source_file_name
     source_folder_name = args.source_folder_name
     source_file_name_match_type = args.source_file_name_match_type
 
     # query payload
     query_data = {}
-    if args.name:
-        query_data["name"] = args.name
-
-    if args.description:
-        query_data["description"] = args.description
-
-    if args.issue_type:
-        query_data["issue_type"] = args.issue_type
-
     if args.estimate:
         query_data["estimate"] = args.estimate
 
@@ -201,8 +220,8 @@ def main():
     
     member_ids = get_member_ids_by_names(access_token, literal_eval(args.owners))
     if member_ids:
-        query_data['follower_ids'] = member_ids
-
+        query_data['owner_ids'] = member_ids
+    
     # add attachments
     file_ids = []
     if source_file_name_match_type == 'regex_match':
@@ -225,17 +244,19 @@ def main():
     
     if file_ids:
         query_data['file_ids'] = file_ids
-
-    story_data = update_story(access_token, story_public_id, query_data)
+    
+    story_data = create_story(access_token, name, description, issue_type, 
+                query_data)
 
     story_id = story_data['id']
     
-    # save response
+    # save issue to responses
     issue_data_filename = shipyard.files.combine_folder_and_file_name(
         artifact_subfolder_paths['responses'],
         f'create_story_{story_id}_response.json')
     shipyard.files.write_json_to_file(story_data, issue_data_filename)
 
     
+
 if __name__ == "__main__":
     main()
