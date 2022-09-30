@@ -217,34 +217,36 @@ def main():
 
     if args.custom_json:
         query_data['custom_fields'] = args.custom_json
-    
-    member_ids = get_member_ids_by_names(access_token, literal_eval(args.owners))
-    if member_ids:
+
+    if args.owners:
+        member_ids = get_member_ids_by_names(access_token, literal_eval(args.owners))
         query_data['owner_ids'] = member_ids
     
     # add attachments
     file_ids = []
-    if source_file_name_match_type == 'regex_match':
-        all_local_files = shipyard.files.find_all_local_file_names(
-            source_folder_name)
-        matching_file_names = shipyard.files.find_all_file_matches(
-            all_local_files, re.compile(source_file_name))
-        for index, file_name in enumerate(matching_file_names):
+    if args.source_file_name:
+        if source_file_name_match_type == 'regex_match':
+            all_local_files = shipyard.files.find_all_local_file_names(
+                source_folder_name)
+            matching_file_names = shipyard.files.find_all_file_matches(
+                all_local_files, re.compile(source_file_name))
+            print(f"{len(matching_file_names)} found!")
+            for index, file_name in enumerate(matching_file_names):
+                file_data = upload_file_attachment(access_token,
+                                    file_name)
+                file_id = file_data[0]['id']
+                file_ids.append(file_id)
+        else:
+            source_file_path = shipyard.files.combine_folder_and_file_name(
+                source_folder_name, source_file_name)
             file_data = upload_file_attachment(access_token,
-                                file_name)
+                                source_file_path)
             file_id = file_data[0]['id']
             file_ids.append(file_id)
-    else:
-        source_file_path = shipyard.files.combine_folder_and_file_name(
-            source_folder_name, source_file_name)
-        file_data = upload_file_attachment(access_token,
-                            source_file_path)
-        file_id = file_data[0]['id']
-        file_ids.append(file_id)
     
-    if file_ids:
-        query_data['file_ids'] = file_ids
-    
+        if file_ids:
+            query_data['file_ids'] = file_ids
+
     story_data = create_story(access_token, name, description, issue_type, 
                 query_data)
 
