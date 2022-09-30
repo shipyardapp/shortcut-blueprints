@@ -33,7 +33,7 @@ def get_args():
     parser.add_argument('--custom-json', dest='custom_json', required=False)
     parser.add_argument('--issue-type', 
                         dest='issue_type', 
-                        required=True,
+                        required=False,
                         choices={'bug', 'chore', 'feature'})
     parser.add_argument(
         '--source-file-name',
@@ -192,9 +192,6 @@ def main():
 
     if args.external_links:
         query_data['external_links'] = literal_eval(args.external_links)
-
-    if args.project_id:
-        query_data["project_id"] = args.project_id
 
     if args.custom_json:
         query_data['custom_fields'] = args.custom_json

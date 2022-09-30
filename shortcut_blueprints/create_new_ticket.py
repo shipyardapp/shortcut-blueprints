@@ -77,7 +77,6 @@ def create_story(token, name, description, issue_type, query_data):
     }
 
     payload = {
-        "archived": True, 
         "description": description,
         "move_to": "first", 
         "name": name, 
